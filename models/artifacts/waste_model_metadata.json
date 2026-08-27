@@ -1,0 +1,101 @@
+{
+  "model_type": "HistGradientBoosting",
+  "model_params": {
+    "categorical_features": "from_dtype",
+    "early_stopping": true,
+    "interaction_cst": null,
+    "l2_regularization": 0.0,
+    "learning_rate": 0.1,
+    "loss": "squared_error",
+    "max_bins": 255,
+    "max_depth": 6,
+    "max_features": 1.0,
+    "max_iter": 200,
+    "max_leaf_nodes": 31,
+    "min_samples_leaf": 20,
+    "monotonic_cst": null,
+    "n_iter_no_change": 10,
+    "quantile": null,
+    "random_state": 42,
+    "scoring": "loss",
+    "tol": 1e-07,
+    "validation_fraction": 0.1,
+    "verbose": 0,
+    "warm_start": false
+  },
+  "target": "waste_pct",
+  "target_units": "percentage (0.0\u2013100.0)",
+  "target_formula": "waste_pct_pct = (Waste quantity / Production quantity) * 100",
+  "features": {
+    "numerical": [
+      "Production quantity",
+      "Production speed",
+      "Machine age",
+      "Humidity",
+      "Temperature",
+      "Machine failure"
+    ],
+    "categorical": [
+      "Machine ID",
+      "Fabric type",
+      "Operator",
+      "Shift"
+    ],
+    "all": [
+      "Machine ID",
+      "Fabric type",
+      "Operator",
+      "Shift",
+      "Production quantity",
+      "Production speed",
+      "Machine age",
+      "Humidity",
+      "Temperature",
+      "Machine failure"
+    ],
+    "feature_order": [
+      "Machine ID",
+      "Fabric type",
+      "Operator",
+      "Shift",
+      "Production quantity",
+      "Production speed",
+      "Machine age",
+      "Humidity",
+      "Temperature",
+      "Machine failure"
+    ]
+  },
+  "forbidden_columns": [
+    "Waste quantity",
+    "Waste percentage",
+    "waste_pct"
+  ],
+  "training_dataset": "data/production/historical_production.csv",
+  "dataset_source": "UCI AI4I 2020 (proxy-transformed to textile domain)",
+  "training_records": 8000,
+  "validation_records": 2000,
+  "metrics": {
+    "HistGradientBoosting": {
+      "train_mae_pct": 0.015942524892588558,
+      "val_mae_pct": 0.017284738088168695,
+      "train_rmse_pct": 0.022316218512381362,
+      "val_rmse_pct": 0.024859082676874308,
+      "train_r2": 0.877772927966431,
+      "val_r2": 0.8497265643275246
+    },
+    "RandomForest": {
+      "train_mae_pct": 0.01268133120530279,
+      "val_mae_pct": 0.017581859014527596,
+      "train_rmse_pct": 0.017757602257899723,
+      "val_rmse_pct": 0.025796799411034722,
+      "train_r2": 0.9226082180585224,
+      "val_r2": 0.8381757243613366
+    }
+  },
+  "random_seed": 42,
+  "split_strategy": "random 80/20",
+  "training_timestamp": "2026-08-28T03:10:32.243051",
+  "feature_version": "v3_waste_pct_percentage",
+  "version": "3.0"
+}

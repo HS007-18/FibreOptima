@@ -1,0 +1,46 @@
+datasets:
+  historical_production:
+    path: data/production/historical_production.csv
+    role: baseline_and_ml_training
+    allowed:
+      - v1
+      - ml_training
+      - analytics
+    forbidden:
+      - final_evaluation
+      - hidden_tests
+  
+  temporal_holdout:
+    path: data/evaluation/temporal_holdout.csv
+    role: evaluation_only
+    allowed:
+      - evaluation
+    forbidden:
+      - ml_training
+      - baseline
+  
+  adversarial_cases:
+    path: data/evaluation/adversarial_cases.csv
+    role: adversarial_evaluation
+    allowed:
+      - hidden_testing
+    forbidden:
+      - ml_training
+      - baseline
+
+  hidden_cases:
+    path: data/evaluation/hidden_cases.csv
+    role: adversarial_evaluation
+    allowed:
+      - hidden_testing
+    forbidden:
+      - ml_training
+      - baseline
+      
+  knowledge:
+    path: data/knowledge/
+    role: agentic_rag
+    allowed:
+      - rag
+    forbidden:
+      - ml_training
