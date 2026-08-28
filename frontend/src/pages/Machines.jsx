@@ -71,6 +71,12 @@ export default function Machines() {
                     </div>
                   </div>
                   <div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Total Batches</div>
+                    <div style={{ fontWeight: 600, color: '#0f172a' }}>
+                      {m.baseline?.total_batches || 1000} batches
+                    </div>
+                  </div>
+                  <div>
                     <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Maintenance</div>
                     <div style={{ fontWeight: 600 }}>
                       {m.maintenance ? `${m.maintenance.days_ago} days ago` : 'None'}

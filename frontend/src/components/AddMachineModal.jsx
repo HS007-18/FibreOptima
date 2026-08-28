@@ -10,6 +10,9 @@ export default function AddMachineModal({ onClose, onAdded }) {
     machine_type: 'Cotton Loom',
     rated_capacity: '1500',
     rated_speed: '1000',
+    machine_age: '3.5',
+    total_batches: '1000',
+    last_maintenance_date: '2026-01-15',
     installation_date: '2026-01-01',
     status: 'Active'
   });
@@ -36,6 +39,9 @@ export default function AddMachineModal({ onClose, onAdded }) {
         machine_type: formData.machine_type,
         rated_capacity: parseFloat(formData.rated_capacity),
         rated_speed: parseFloat(formData.rated_speed),
+        machine_age: parseFloat(formData.machine_age || 3.5),
+        total_batches: parseInt(formData.total_batches || 1000, 10),
+        last_maintenance_date: formData.last_maintenance_date,
         installation_date: formData.installation_date,
         status: formData.status
       });
@@ -54,7 +60,7 @@ export default function AddMachineModal({ onClose, onAdded }) {
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <PlusCircle color="#2563eb" size={20} /> Add New Machine
+            <PlusCircle color="#2563eb" size={20} /> Register New Machine Context in CompanyDB
           </h2>
           <button style={{ background: 'none', border: 'none', cursor: 'pointer' }} onClick={onClose}>
             <X size={20} />
@@ -68,14 +74,16 @@ export default function AddMachineModal({ onClose, onAdded }) {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Machine ID (e.g. M11)</label>
-            <input name="machine_id" value={formData.machine_id} onChange={handleChange} placeholder="M11" required />
-          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Machine ID (e.g. M11)</label>
+              <input name="machine_id" value={formData.machine_id} onChange={handleChange} placeholder="M11" required />
+            </div>
 
-          <div className="form-group">
-            <label>Machine Type / Name</label>
-            <input name="machine_type" value={formData.machine_type} onChange={handleChange} placeholder="Cotton Loom" />
+            <div className="form-group">
+              <label>Machine Type / Name</label>
+              <input name="machine_type" value={formData.machine_type} onChange={handleChange} placeholder="Cotton Loom" />
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -92,24 +100,41 @@ export default function AddMachineModal({ onClose, onAdded }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label>Installation Date</label>
-              <input type="date" name="installation_date" value={formData.installation_date} onChange={handleChange} />
+              <label>Machine Age (Years)</label>
+              <input type="number" step="0.1" name="machine_age" value={formData.machine_age} onChange={handleChange} required />
             </div>
 
             <div className="form-group">
-              <label>Status</label>
-              <select name="status" value={formData.status} onChange={handleChange}>
-                <option value="Active">Active</option>
-                <option value="Maintenance">Maintenance</option>
-                <option value="Inactive">Inactive</option>
-              </select>
+              <label>Total Batches Runned</label>
+              <input type="number" name="total_batches" value={formData.total_batches} onChange={handleChange} required />
             </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Last Maintenance Date</label>
+              <input type="date" name="last_maintenance_date" value={formData.last_maintenance_date} onChange={handleChange} required />
+            </div>
+
+            <div className="form-group">
+              <label>Installation Date</label>
+              <input type="date" name="installation_date" value={formData.installation_date} onChange={handleChange} />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Operating Status</label>
+            <select name="status" value={formData.status} onChange={handleChange}>
+              <option value="Active">Active</option>
+              <option value="Maintenance">Maintenance</option>
+              <option value="Inactive">Inactive</option>
+            </select>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Adding...' : 'Save Machine to DB'}
+              {loading ? 'Registering...' : 'Save Machine to DB'}
             </button>
           </div>
         </form>

@@ -1,0 +1,11 @@
+Batch ID,Machine ID,Fabric type,Operator,Shift,Production quantity,Production speed,Waste quantity,Machine age,Last maintenance date,Humidity,Temperature
+B-M01-100,M01,Cotton,OP01,Morning,1400.0,1200.0,45.0,4.5,2026-01-15,,26.0
+B-M02-101,M02,Polyester,OP02,Evening,1400.0,1200.0,45.0,4.5,2026-01-15,70.0,26.0
+B-M03-102,M03,Nylon,OP03,Night,1400.0,1200.0,45.0,4.5,2026-01-15,,26.0
+B-M04-103,M04,Silk,OP04,Morning,1400.0,1200.0,45.0,4.5,2026-01-15,70.0,26.0
+B-M05-104,M05,Wool,OP05,Evening,1400.0,1200.0,45.0,4.5,2026-01-15,,26.0
+B-M06-105,M06,Cotton,OP01,Night,1400.0,1200.0,45.0,4.5,2026-01-15,70.0,26.0
+B-M07-106,M07,Polyester,OP02,Morning,1400.0,1200.0,45.0,4.5,2026-01-15,,26.0
+B-M08-107,M08,Nylon,OP03,Evening,1400.0,1200.0,45.0,4.5,2026-01-15,70.0,26.0
+B-M09-108,M09,Silk,OP04,Night,1400.0,1200.0,45.0,4.5,2026-01-15,,26.0
+B-M10-109,M10,Wool,OP05,Morning,1400.0,1200.0,45.0,4.5,2026-01-15,70.0,26.0

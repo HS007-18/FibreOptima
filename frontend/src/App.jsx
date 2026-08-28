@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import ChatAssistant from './components/ChatAssistant';
 import Dashboard from './pages/Dashboard';
 import Machines from './pages/Machines';
 import Predict from './pages/Predict';
@@ -52,6 +53,7 @@ function App() {
             </Routes>
           </main>
         </div>
+        <ChatAssistant />
       </div>
     </Router>
   );

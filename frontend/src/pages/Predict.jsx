@@ -1,108 +1,138 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { Play, Cpu, AlertTriangle, ShieldCheck, HelpCircle, Activity } from 'lucide-react';
+import { Cpu, Play, HelpCircle, Activity, ShieldCheck, AlertTriangle, ArrowLeft, BarChart2, CheckCircle2, BookOpen, Wrench } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import OODExplainer from '../components/OODExplainer';
 import IntelligenceStack from '../components/IntelligenceStack';
 
 const API_URL = 'http://localhost:8000/api';
 
 export default function Predict() {
-  const { machine_id } = useParams();
-  const targetMachine = machine_id || 'M01';
-
+  const { machineId } = useParams();
   const [machineProfile, setMachineProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState(null);
-
   const [telemetry, setTelemetry] = useState({
-    "Batch ID": "B-SINGLE-001",
-    "Machine ID": targetMachine,
+    "Batch ID": `B-SINGLE-${Math.floor(100 + Math.random() * 900)}`,
+    "Machine ID": machineId || "M01",
     "Fabric type": "Cotton",
     "Operator": "OP01",
     "Shift": "Morning",
-    "Production quantity": 1200.0,
-    "Production speed": 850.0,
-    "Waste quantity": 25.0,
-    "Machine age": 5.0,
-    "Humidity": 55.0,
-    "Temperature": 25.0,
-    "Last maintenance date": "2026-01-15"
+    "Production quantity": 1400.0,
+    "Production speed": 1200.0,
+    "Waste quantity": 45.0,
+    "Humidity": 70.0,
+    "Temperature": 26.0,
   });
 
-  useEffect(() => {
-    fetchMachineProfile();
-  }, [targetMachine]);
+  const [result, setResult] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
-  const fetchMachineProfile = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/machines/${targetMachine}`);
-      setMachineProfile(res.data);
-      setTelemetry(prev => ({
-        ...prev,
-        "Machine ID": targetMachine,
-        "Machine age": res.data.installation_date ? 5.0 : 5.0
-      }));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (machineId) {
+      axios.get(`${API_URL}/machines/${machineId}`)
+        .then(res => {
+          setMachineProfile(res.data);
+          setTelemetry(prev => ({
+            ...prev,
+            "Machine ID": machineId,
+            "Production speed": res.data.rated_speed || 1200.0,
+            "Production quantity": Math.round((res.data.rated_capacity || 1800) * 0.8)
+          }));
+        })
+        .catch(err => console.error(err));
     }
-  };
+  }, [machineId]);
 
   const handleChange = (e) => {
-    const val = e.target.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
-    setTelemetry({ ...telemetry, [e.target.name]: val });
+    const { name, value, type } = e.target;
+    setTelemetry(prev => ({
+      ...prev,
+      [name]: type === 'number' ? (value === '' ? '' : parseFloat(value)) : value
+    }));
   };
 
   const handleAnalyze = async (e) => {
     e.preventDefault();
     setAnalyzing(true);
-    setResult(null);
-
     try {
       const res = await axios.post(`${API_URL}/predict`, telemetry);
       setResult(res.data);
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.detail || "Failed to execute prediction pipeline.");
+      alert("Failed to process batch prediction.");
     } finally {
       setAnalyzing(false);
     }
   };
 
+  // Metrics for Single Machine Charts
+  const obsWaste = telemetry["Production quantity"] > 0 ? (telemetry["Waste quantity"] / telemetry["Production quantity"] * 100) : 0;
+  const baselineWaste = result?.historical_waste_pct ?? machineProfile?.baseline?.historical_waste_pct ?? 5.8;
+  const predWaste = result?.predicted_waste_pct ?? 4.63;
+
+  const wasteChartData = [
+    { name: 'Observed Waste %', value: parseFloat(obsWaste.toFixed(2)), fill: '#2563eb' },
+    { name: 'Historical Baseline %', value: parseFloat(baselineWaste.toFixed(2)), fill: '#64748b' },
+    { name: 'ML Predicted Waste %', value: parseFloat(predWaste.toFixed(2)), fill: '#d97706' }
+  ];
+
+  const speedCapacityData = [
+    { name: 'Speed (RPM)', current: telemetry["Production speed"] || 0, limit: machineProfile?.rated_speed || 1200 },
+    { name: 'Capacity Util (%)', current: result?.utilization_percentage ? parseFloat(result.utilization_percentage.toFixed(1)) : 77.8, limit: 100 }
+  ];
+
+  // Helper parser for recommendations
+  const parseRecommendations = (text) => {
+    if (!text) return [
+      "Verify production speed settings against rated machine limits (1200 RPM)",
+      "Schedule preventive maintenance review within 48 hours",
+      "Monitor humidity levels to maintain fiber elasticity during spinning"
+    ];
+    const matches = text.match(/→[^\n→]+/g);
+    if (!matches) return [
+      "Inspect machine alignment and sensor calibration",
+      "Verify environmental controls (humidity/temperature) within specification"
+    ];
+    return matches.map(m => m.replace(/^→\s?/, '').trim());
+  };
+
   return (
     <div>
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Single Machine Telemetry Predictor</h2>
-        <p style={{ fontSize: '0.85rem', color: '#64748b' }}>Analyze current operating parameters against CompanyDB facts and ML models</p>
+      <div style={{ marginBottom: '1.25rem' }}>
+        <Link to="/machines" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#2563eb', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600 }}>
+          <ArrowLeft size={16} /> Back to Factory Machines Catalog
+        </Link>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: '0.5rem' }}>
+          Single Production Record Analysis — Machine {telemetry["Machine ID"]}
+        </h2>
+        <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
+          Machine permanent context (capacity, rated speed, age, maintenance history) is automatically loaded from CompanyDB. Enter new production record telemetry below.
+        </p>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: '1fr 1.2fr' }}>
-        {/* Left: Pre-populated Machine Profile + Operational Inputs Form */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          
-          {/* Known CompanyDB Context Header */}
-          <div className="card" style={{ background: '#f8fafc', borderLeft: '4px solid #2563eb' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Cpu size={18} color="#2563eb" /> CompanyDB Context: {targetMachine}
-            </h3>
-            {loading ? (
-              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Fetching profile...</div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', color: '#334155' }}>
-                <div><strong>Rated Capacity:</strong> {machineProfile?.rated_capacity} units</div>
-                <div><strong>Rated Speed:</strong> {machineProfile?.rated_speed} RPM</div>
-                <div><strong>Baseline Waste:</strong> {machineProfile?.baseline?.historical_waste_pct?.toFixed(1)}%</div>
-                <div><strong>Status:</strong> {machineProfile?.status}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+        {/* Left: Saved Machine Profile & New Production Telemetry Form */}
+        <div>
+          {/* Machine Permanent Context Card */}
+          {machineProfile && (
+            <div className="card" style={{ marginBottom: '1.25rem', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a' }}>
+                <Cpu size={18} color="#2563eb" /> CompanyDB Permanent Machine Context
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem', color: '#334155' }}>
+                <div><strong>Machine Type:</strong> {machineProfile.machine_type || 'Spinning Frame'}</div>
+                <div><strong>Rated Capacity:</strong> {machineProfile.rated_capacity} units</div>
+                <div><strong>Rated Speed:</strong> {machineProfile.rated_speed} RPM</div>
+                <div><strong>Historical Waste:</strong> {machineProfile.baseline?.historical_waste_pct?.toFixed(1)}%</div>
+                <div><strong>Installation Date:</strong> {machineProfile.installation_date}</div>
+                <div><strong>Status:</strong> {machineProfile.status}</div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Form */}
+          {/* Clean Telemetry Form (Without redundant machine age / maintenance re-entry) */}
           <form className="card" onSubmit={handleAnalyze}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Operational Telemetry Input</h3>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>New Production Record Telemetry</h3>
             
             <div className="form-group">
               <label>Machine ID (Fixed from DB)</label>
@@ -111,7 +141,7 @@ export default function Predict() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
-                <label>Production Quantity</label>
+                <label>Production Quantity (kg)</label>
                 <input type="number" name="Production quantity" value={telemetry["Production quantity"]} onChange={handleChange} required />
               </div>
 
@@ -123,7 +153,7 @@ export default function Predict() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
-                <label>Waste Quantity</label>
+                <label>Waste Quantity (kg)</label>
                 <input type="number" name="Waste quantity" value={telemetry["Waste quantity"]} onChange={handleChange} required />
               </div>
 
@@ -173,7 +203,7 @@ export default function Predict() {
           </form>
         </div>
 
-        {/* Right: Results Page */}
+        {/* Right: Interactive Visual Results Page */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {result ? (
             <>
@@ -186,7 +216,7 @@ export default function Predict() {
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem', textAlignment: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem', textAlign: 'center' }}>
                   <div style={{ background: '#eff6ff', padding: '1rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
                     <div style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: 600 }}>PREDICTED WASTE</div>
                     <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1d4ed8' }}>
@@ -215,35 +245,54 @@ export default function Predict() {
                   reasons={result.ood_reasons}
                   confidence={result.prediction_confidence}
                 />
-
-                {/* Why? Section */}
-                <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <HelpCircle size={18} color="#2563eb" /> Why was this signal generated?
-                  </h4>
-                  <ul style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.6, paddingLeft: '1.25rem' }}>
-                    <li>
-                      <strong>Speed Telemetry:</strong> Operating at {telemetry["Production speed"]} RPM vs machine baseline of {machineProfile?.baseline?.historical_avg_speed?.toFixed(0) || 1000} RPM.
-                    </li>
-                    <li>
-                      <strong>Capacity Utilization:</strong> Operating at {result.utilization_percentage?.toFixed(1)}% of rated capacity ({result.rated_capacity} units).
-                    </li>
-                    <li>
-                      <strong>Baseline Deviation:</strong> Predicted waste of {result.predicted_waste_pct?.toFixed(2)}% vs machine baseline of {result.historical_waste_pct?.toFixed(1)}%.
-                    </li>
-                  </ul>
-                </div>
               </div>
 
-              {/* Offline Investigation Output */}
+              {/* Single Machine Visual Analytics Charts */}
               <div className="card">
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <ShieldCheck size={18} color="#16a34a" /> Offline Investigation Engine Report
-                </h4>
-                <div style={{ background: '#0f172a', color: '#f8fafc', padding: '1rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: '1.5', whitespace: 'pre-wrap' }}>
-                  {result.investigation}
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a' }}>
+                  <BarChart2 size={18} color="#2563eb" /> Single Machine Waste Breakdown & Performance Charts
+                </h3>
+
+                {/* Chart 1: Waste Comparison Bar Chart */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.5rem' }}>
+                    Waste Comparison: Observed vs Baseline vs ML Predicted Waste %
+                  </h4>
+                  <div style={{ height: 180 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={wasteChartData} layout="vertical">
+                        <XAxis type="number" unit="%" />
+                        <YAxis dataKey="name" type="category" width={150} style={{ fontSize: '0.8rem', fontWeight: 600 }} />
+                        <Tooltip formatter={(val) => [`${val}%`, 'Waste']} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                          {wasteChartData.map((entry, idx) => <cell key={idx} fill={entry.fill} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Chart 2: Speed & Utilization Limits Chart */}
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '0.5rem' }}>
+                    Operating Speed & Capacity Utilization vs Rated Limits
+                  </h4>
+                  <div style={{ height: 180 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={speedCapacityData}>
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="current" fill="#2563eb" name="Observed Current" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="limit" fill="#94a3b8" name="Rated Upper Limit" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
+
+
             </>
           ) : (
             <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem', color: '#94a3b8' }}>
