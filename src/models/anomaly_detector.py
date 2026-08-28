@@ -20,6 +20,9 @@ class TextileAnomalyDetector:
         self.feature_names_: List[str] = []
         self.raw_means_: Dict[str, float] = {}
         self.raw_stds_: Dict[str, float] = {}
+        self.raw_mins_: Dict[str, float] = {}
+        self.raw_maxs_: Dict[str, float] = {}
+        self.fitted_categories_: Dict[str, set] = {}
 
     def fit(self, X_train_raw: pd.DataFrame, preprocessor) -> "TextileAnomalyDetector":
         """Fit Isolation Forest model and store raw feature baseline stats."""
@@ -27,6 +30,14 @@ class TextileAnomalyDetector:
         for col in NUMERICAL_FEATURES:
             self.raw_means_[col] = float(engineered[col].mean())
             self.raw_stds_[col] = float(engineered[col].std())
+            self.raw_mins_[col] = float(engineered[col].min())
+            self.raw_maxs_[col] = float(engineered[col].max())
+
+        # Extract fitted categories
+        cat_cols = ["Machine ID", "Fabric type", "Operator", "Shift"]
+        for col in cat_cols:
+            if col in X_train_raw.columns:
+                self.fitted_categories_[col] = set(X_train_raw[col].dropna().unique())
 
         X_processed = preprocessor.fit_transform(X_train_raw)
         self.model.fit(X_processed)
@@ -101,14 +112,39 @@ class TextileAnomalyDetector:
         # 2. Business Logic & ML Risk Classification
         biz_flag, ml_flag, risk_class = self.classify_risk(raw_waste_pct, score)
 
-        # 3. Statistical Deviations (Raw Z-Scores)
+        # 3. Statistical Deviations & OOD Detection
         engineered_record = preprocessor.named_steps["engineer"].transform(raw_record)
         z_scores = {}
+        is_ood = False
+        ood_reasons = []
+
         for feature in NUMERICAL_FEATURES:
             val = float(engineered_record[feature].iloc[0]) if not pd.isna(engineered_record[feature].iloc[0]) else 0.0
             mean = self.raw_means_.get(feature, 0.0)
             std = self.raw_stds_.get(feature, 1.0)
-            z_scores[feature] = float((val - mean) / std) if std > 0 else 0.0
+            z = float((val - mean) / std) if std > 0 else 0.0
+            z_scores[feature] = z
+
+            f_min = self.raw_mins_.get(feature, -float("inf"))
+            f_max = self.raw_maxs_.get(feature, float("inf"))
+
+            if val < f_min or val > f_max:
+                is_ood = True
+                ood_reasons.append(f"{feature} ({val:.1f}) is outside training range [{f_min:.1f}, {f_max:.1f}]")
+            elif abs(z) > 3.0:
+                is_ood = True
+                ood_reasons.append(f"{feature} has absolute z-score > 3.0 ({z:.2f})")
+
+        cat_cols = ["Machine ID", "Fabric type", "Operator", "Shift"]
+        for col in cat_cols:
+            if col in raw_record.columns:
+                val = raw_record[col].iloc[0]
+                if not pd.isna(val) and col in self.fitted_categories_:
+                    if val not in self.fitted_categories_[col]:
+                        is_ood = True
+                        ood_reasons.append(f"Unseen {col}: {val}")
+
+        prediction_confidence = "Low" if is_ood else "High"
 
         # 4. Feature Contributions (Attribution via Perturbation)
         contributions = {}
@@ -133,4 +169,7 @@ class TextileAnomalyDetector:
             statistical_deviations=z_scores,
             feature_contributions=contributions,
             investigation_mode="Offline Evidence Engine",
+            is_ood=is_ood,
+            ood_reasons=ood_reasons,
+            prediction_confidence=prediction_confidence,
         )

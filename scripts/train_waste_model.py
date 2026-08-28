@@ -7,6 +7,7 @@ Forbidden features: Waste quantity, Waste percentage, waste_pct (leakage)
 Models compared:
   - HistGradientBoostingRegressor (primary candidate)
   - RandomForestRegressor (baseline)
+  - ExtraTreesRegressor
 
 Artifacts saved to models/artifacts/:
   - waste_predictor.pkl        (best model)
@@ -22,7 +23,7 @@ import joblib
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor, ExtraTreesRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -162,6 +163,14 @@ def train_models(X_train, y_train, X_val, y_val, preprocessor):
             random_state=42,
             n_jobs=-1,
         ),
+        "ExtraTrees": ExtraTreesRegressor(
+            n_estimators=200,
+            max_depth=12,
+            min_samples_split=5,
+            min_samples_leaf=2,
+            random_state=42,
+            n_jobs=-1,
+        ),
     }
 
     results = {}
@@ -229,11 +238,12 @@ def save_artifacts(preprocessor, model, model_name, results, extra_meta):
         "training_records": extra_meta["train_size"],
         "validation_records": extra_meta["val_size"],
         "metrics": results,
+        "target_statistics": extra_meta["target_stats"],
         "random_seed": 42,
         "split_strategy": "random 80/20",
         "training_timestamp": datetime.now().isoformat(),
-        "feature_version": "v3_waste_pct_percentage",
-        "version": "3.0",
+        "feature_version": "v4_waste_pct_percentage_textile_proxy",
+        "version": "4.0",
     }
 
     with open(os.path.join(artifacts_dir, "waste_model_metadata.json"), "w") as f:
@@ -295,11 +305,14 @@ def main():
     print("\n[1] Loading data...")
     df = load_and_prepare_data(data_path)
     print(f"  Dataset shape: {df.shape}")
-    print(f"  Target stats: mean={df[TARGET_COLUMN].mean():.6f}%  "
-          f"std={df[TARGET_COLUMN].std():.6f}%  "
-          f"max={df[TARGET_COLUMN].max():.6f}%")
-    print(f"  Note: Proxy-dataset waste_pct range is 0.001–0.49% (small by design — "
-          f"units are kg waste / (RPM×10 metres) × 100)")
+    print(f"  Feature columns: {ALL_FEATURES}")
+    print(f"  Target statistics:")
+    print(f"    Min waste %: {df[TARGET_COLUMN].min():.4f}")
+    print(f"    Max waste %: {df[TARGET_COLUMN].max():.4f}")
+    print(f"    Mean waste %: {df[TARGET_COLUMN].mean():.4f}")
+    print(f"    Median waste %: {df[TARGET_COLUMN].median():.4f}")
+    print(f"    P95 waste %: {df[TARGET_COLUMN].quantile(0.95):.4f}")
+    print(f"    P99 waste %: {df[TARGET_COLUMN].quantile(0.99):.4f}")
 
     print("\n[2] Splitting data (80/20, random seed=42)...")
     X = df[ALL_FEATURES]
@@ -322,7 +335,11 @@ def main():
     print("\n[4] Saving artifacts...")
     save_artifacts(
         preprocessor, best_model, best_name, results,
-        {"train_size": len(X_train), "val_size": len(X_val)},
+        {
+            "train_size": len(X_train), 
+            "val_size": len(X_val),
+            "target_stats": df[TARGET_COLUMN].describe().to_dict()
+        },
     )
 
     print("\n[5] Reproducibility test...")

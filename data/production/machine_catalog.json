@@ -1,0 +1,82 @@
+[
+  {
+    "machine_id": "M01",
+    "machine_type": "Spinning Frame",
+    "rated_capacity": 1840.0,
+    "rated_speed": 2620.0,
+    "installation_date": "2021-01-15",
+    "status": "Operational"
+  },
+  {
+    "machine_id": "M02",
+    "machine_type": "Textile Loom",
+    "rated_capacity": 1900.0,
+    "rated_speed": 2720.0,
+    "installation_date": "2022-01-15",
+    "status": "Operational"
+  },
+  {
+    "machine_id": "M03",
+    "machine_type": "Spinning Frame",
+    "rated_capacity": 1820.0,
+    "rated_speed": 2600.0,
+    "installation_date": "2023-01-15",
+    "status": "Operational"
+  },
+  {
+    "machine_id": "M04",
+    "machine_type": "Textile Loom",
+    "rated_capacity": 1790.0,
+    "rated_speed": 2560.0,
+    "installation_date": "2020-01-15",
+    "status": "Operational"
+  },
+  {
+    "machine_id": "M05",
+    "machine_type": "Spinning Frame",
+    "rated_capacity": 1910.0,
+    "rated_speed": 2730.0,
+    "installation_date": "2021-01-15",
+    "status": "Operational"
+  },
+  {
+    "machine_id": "M06",
+    "machine_type": "Textile Loom",
+    "rated_capacity": 1920.0,
+    "rated_speed": 2740.0,
+    "installation_date": "2022-01-15",
+    "status": "Operational"
+  },
+  {
+    "machine_id": "M07",
+    "machine_type": "Spinning Frame",
+    "rated_capacity": 1810.0,
+    "rated_speed": 2580.0,
+    "installation_date": "2023-01-15",
+    "status": "Operational"
+  },
+  {
+    "machine_id": "M08",
+    "machine_type": "Textile Loom",
+    "rated_capacity": 1880.0,
+    "rated_speed": 2680.0,
+    "installation_date": "2020-01-15",
+    "status": "Operational"
+  },
+  {
+    "machine_id": "M09",
+    "machine_type": "Spinning Frame",
+    "rated_capacity": 1880.0,
+    "rated_speed": 2690.0,
+    "installation_date": "2021-01-15",
+    "status": "Operational"
+  },
+  {
+    "machine_id": "M10",
+    "machine_type": "Textile Loom",
+    "rated_capacity": 1790.0,
+    "rated_speed": 2560.0,
+    "installation_date": "2022-01-15",
+    "status": "Operational"
+  }
+]

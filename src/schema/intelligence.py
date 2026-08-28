@@ -16,3 +16,6 @@ class AnomalyIntelligencePacket:
     statistical_deviations: Dict[str, float]
     feature_contributions: Dict[str, float]
     investigation_mode: str = "Offline Evidence Engine"
+    is_ood: bool = False
+    ood_reasons: list = field(default_factory=list)
+    prediction_confidence: str = "High"

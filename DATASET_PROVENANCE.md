@@ -3,7 +3,8 @@
 ## Overview
 FibreOptima requires highly specific multivariate edge cases (e.g., hidden test cases involving production speed, missing humidity, and multidimensional waste percentage calculations). Because no public real-world dataset perfectly matches these exact requirements for the textile domain, we have engineered a **Proxy Textile Dataset** derived entirely from legitimate industrial telemetry.
 
-## Source Data
+## Source
+> The dataset is a textile-domain proof-of-concept created through deterministic proxy transformation of UCI AI4I industrial telemetry. The resulting textile variables are proxies and are not measurements from an actual textile factory.
 - **Original Dataset**: AI4I 2020 Predictive Maintenance Dataset
 - **Source**: UCI Machine Learning Repository
 - **Nature**: Real-world operational telemetry from a German industrial machine.

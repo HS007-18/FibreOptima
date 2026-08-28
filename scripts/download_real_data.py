@@ -36,17 +36,23 @@ def download_and_prepare():
     logger.info(f"Loaded {len(df)} raw records.")
 
     df["Batch ID"] = df["UDI"].astype(str)
-    df["Machine ID"] = df["Product ID"]
-    df["Fabric type"] = df["Type"].map({"L": "Cotton", "M": "Polyester", "H": "Silk"})
-    df["Operator"] = "Op-" + (df["UDI"] % 20 + 1).astype(str)
+    df["Machine ID"] = "M" + (df["UDI"] % 10 + 1).astype(str).str.zfill(2)
+    df["Fabric type"] = df["Type"].map({"L": "Cotton", "M": "Polyester", "H": "Blended"})
+    df["Operator"] = "OP" + (df["UDI"] % 20 + 1).astype(str).str.zfill(2)
     df["Shift"] = df["UDI"].apply(lambda x: ["Morning", "Evening", "Night"][x % 3])
-    df["Production quantity"] = df["Rotational speed [rpm]"] * 10
+    df["Production quantity"] = df["Rotational speed [rpm]"] * 0.7
     df["Production speed"] = df["Rotational speed [rpm]"]
-    df["Waste quantity"] = (df["Torque [Nm]"] ** 2) / 100.0
-    df["Machine age"] = df["Tool wear [min]"] / 10.0
-    df["Last maintenance date"] = "2026-01-01"
-    df["Humidity"] = df["Air temperature [K]"] - 200.0
-    df["Temperature"] = df["Process temperature [K]"] - 250.0
+    df["Waste quantity"] = (df["Torque [Nm]"] ** 2) / 15.0
+    df["Machine age"] = df["Tool wear [min]"] / 20.0
+    
+    # Deterministic dates in the past
+    base_date = pd.to_datetime("2026-01-01")
+    df["Last maintenance date"] = df["UDI"].apply(
+        lambda x: (base_date - pd.Timedelta(days=(x * 7) % 365)).strftime("%Y-%m-%d")
+    )
+    
+    df["Humidity"] = df["Air temperature [K]"] - 230.0
+    df["Temperature"] = df["Process temperature [K]"] - 280.0
 
     final_df = df[
         [

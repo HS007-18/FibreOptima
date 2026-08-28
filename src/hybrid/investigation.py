@@ -21,6 +21,7 @@ class InvestigationReport:
     observed_evidence: Dict[str, Any]
     ml_evidence: Dict[str, Any]
     retrieved_knowledge: List[Dict[str, Any]]
+    company_context: Dict[str, Any]
     logical_inference: List[str]
     recommended_actions: List[str]
     confidence: float
@@ -29,8 +30,9 @@ class InvestigationReport:
 class OfflineInvestigationEngine:
     """Deterministic investigation engine using evidence-based reasoning."""
     
-    def __init__(self, rag_indexer: Optional[object] = None):
+    def __init__(self, rag_indexer: Optional[object] = None, company_db: Optional[object] = None):
         self.rag_indexer = rag_indexer
+        self.company_db = company_db
         self.knowledge_base = self._load_domain_knowledge()
     
     def investigate(self, packet) -> InvestigationReport:
@@ -50,13 +52,16 @@ class OfflineInvestigationEngine:
         # 3. Retrieve Domain Knowledge (RAG)
         retrieved_knowledge = self._retrieve_evidence(packet_dict)
         
-        # 4. Logical Inference
-        logical_inference = self._generate_inference(packet_dict, retrieved_knowledge)
+        # 4. Company Operations Database Context
+        company_context = self._retrieve_company_context(packet_dict)
         
-        # 5. Recommended Actions
-        recommended_actions = self._generate_actions(packet_dict, retrieved_knowledge)
+        # 5. Logical Inference
+        logical_inference = self._generate_inference(packet_dict, retrieved_knowledge, company_context)
         
-        # 6. Confidence Score
+        # 6. Recommended Actions
+        recommended_actions = self._generate_actions(packet_dict, retrieved_knowledge, company_context)
+        
+        # 7. Confidence Score
         confidence = self._calculate_confidence(packet_dict, retrieved_knowledge)
         
         return InvestigationReport(
@@ -67,6 +72,7 @@ class OfflineInvestigationEngine:
             observed_evidence=observed_evidence,
             ml_evidence=ml_evidence,
             retrieved_knowledge=retrieved_knowledge,
+            company_context=company_context,
             logical_inference=logical_inference,
             recommended_actions=recommended_actions,
             confidence=confidence,
@@ -118,35 +124,54 @@ class OfflineInvestigationEngine:
             "biz_flag": packet.get("biz_flag", False),
             "waste_z_score": packet.get("waste_z_score"),
             "anomaly_score": packet.get("anomaly_score"),
+            "is_ood": packet.get("is_ood", False),
+            "ood_reasons": packet.get("ood_reasons", []),
+            "prediction_confidence": packet.get("prediction_confidence", "High"),
         }
     
     def _retrieve_evidence(self, packet: dict) -> List[Dict[str, Any]]:
         """Retrieve relevant domain knowledge from RAG."""
         evidence = []
-        
+        # RAG Retrieval
         if self.rag_indexer:
             try:
-                # Generate queries based on packet signals
+                # Format packet context into query keywords
                 queries = self._generate_queries(packet)
+                seen_docs = set()
                 
-                for query in queries[:3]:  # Limit queries
+                for query in queries:
                     try:
-                        docs = self.rag_indexer.vector_store.similarity_search(query, k=2)
+                        docs = self.rag_indexer.retrieve(query, k=1)
                         for doc in docs:
-                            evidence.append({
-                                "source": doc.metadata.get("Source", "Textile Mill Handbook"),
-                                "topic": doc.metadata.get("Topic", "General"),
-                                "content": doc.page_content[:500],  # Truncate
-                            })
+                            content = doc.page_content
+                            if content not in seen_docs:
+                                evidence.append({
+                                    "source": doc.metadata.get("source", "Technical Documentation"),
+                                    "topic": doc.metadata.get("topic", "Production Guideline"),
+                                    "content": content
+                                })
+                                seen_docs.add(content)
                     except Exception as e:
-                        pass  # Silently fail retrieval
+                        pass  # Silently fail individual query
+                        
+                if not evidence:
+                    evidence.append({
+                        "source": "System",
+                        "topic": "Domain Knowledge",
+                        "content": "No supporting technical evidence retrieved."
+                    })
+                return evidence
             except Exception:
-                pass
+                evidence.append({
+                    "source": "System",
+                    "topic": "System Status",
+                    "content": "RAG vector database unavailable. Using fallback offline intelligence."
+                })
         
-        # Fallback to built-in knowledge base
+        # Fallback to built-in knowledge base if RAG is disabled or failed
         if not evidence:
-            evidence = self._get_fallback_evidence(packet)
-        
+            evidence.extend(self._get_fallback_evidence(packet))
+            
         return evidence
     
     def _generate_queries(self, packet: dict) -> List[str]:
@@ -222,13 +247,83 @@ class OfflineInvestigationEngine:
             })
         
         return evidence
+
+    def _retrieve_company_context(self, packet: dict) -> Dict[str, Any]:
+        """Query Company Operations Database for factual machine constraints."""
+        context = {}
+        if not getattr(self, "company_db", None):
+            return context
+            
+        machine_id = packet.get("machine_id")
+        if not machine_id:
+            return context
+            
+        profile = self.company_db.get_machine_profile(machine_id)
+        if profile:
+            context["rated_speed"] = profile.get("rated_speed")
+            context["rated_capacity"] = profile.get("rated_capacity")
+            
+        baseline = self.company_db.get_machine_baseline(machine_id)
+        if baseline:
+            context["historical_waste"] = baseline.get("historical_waste_pct")
+            
+        maint = self.company_db.get_maintenance_history(machine_id)
+        if maint:
+            context["days_ago"] = maint.get("days_ago")
+            context["issue"] = maint.get("issue")
+            
+        # Utilization Logic
+        rated_capacity = context.get("rated_capacity")
+        current_prod = packet.get("production_quantity")
+        if rated_capacity and current_prod and rated_capacity > 0:
+            utilization = (current_prod / rated_capacity) * 100
+            context["utilization_percentage"] = utilization
+            if utilization < 80:
+                context["capacity_status"] = "Under Capacity"
+            elif utilization <= 100:
+                context["capacity_status"] = "Normal Capacity"
+            else:
+                context["capacity_status"] = "Over Capacity"
+        else:
+            context["utilization_percentage"] = None
+            context["capacity_status"] = "Unknown"
+            
+        return context
     
-    def _generate_inference(self, packet: dict, evidence: List[Dict]) -> List[str]:
+    def _generate_inference(self, packet: dict, evidence: List[Dict], company_context: Dict[str, Any]) -> List[str]:
         """Generate logical inference from evidence."""
         inferences = []
         
         waste_pct = packet.get("waste_pct", 0)
         signals = packet.get("signals", [])
+        is_ood = packet.get("is_ood", False)
+        
+        # DB limits logic
+        rated_speed = company_context.get("rated_speed")
+        current_speed = packet.get("production_speed")
+        hist_waste = company_context.get("historical_waste")
+        pred_waste = packet.get("waste_prediction")
+        maint_days = company_context.get("days_ago")
+        utilization = company_context.get("utilization_percentage")
+        capacity_status = company_context.get("capacity_status")
+        
+        # Company Context Inference
+        if rated_speed and current_speed and hist_waste and pred_waste:
+            inference_str = f"Machine {packet.get('machine_id')} is currently predicted at {pred_waste:.1f}% waste versus its historical baseline of {hist_waste:.1f}%."
+            if current_speed > rated_speed:
+                inference_str += f" Operating speed of {current_speed} RPM exceeds the machine's rated {rated_speed} RPM."
+            if utilization:
+                inference_str += f" Machine is operating at {utilization:.1f}% utilization ({capacity_status})."
+            if maint_days and maint_days > 30:
+                inference_str += " Maintenance is also overdue."
+            inference_str += " Investigate speed configuration and machine condition before continuing production."
+            inferences.append(inference_str)
+        
+        # OOD Inference (Top Priority)
+        if is_ood:
+            inferences.append("This batch is outside the model's learned operating distribution; prediction confidence is low.")
+            for reason in packet.get("ood_reasons", []):
+                inferences.append(f"OOD Reason: {reason}")
         
         # Primary inference based on risk level
         risk_level = packet.get("risk_level", "NORMAL")
@@ -299,7 +394,7 @@ class OfflineInvestigationEngine:
         
         return inferences
     
-    def _generate_actions(self, packet: dict, evidence: List[Dict]) -> List[str]:
+    def _generate_actions(self, packet: dict, evidence: List[Dict], company_context: Dict[str, Any] = None) -> List[str]:
         """Generate recommended actions."""
         actions = []
         risk_level = packet.get("risk_level", "NORMAL")
@@ -379,6 +474,10 @@ class OfflineInvestigationEngine:
             confidence += 0.1
         elif packet.get("waste_prediction_error", 1) > 0.1:
             confidence -= 0.1
+            
+        # OOD override
+        if packet.get("is_ood"):
+            confidence = min(confidence, 0.3)  # Cap confidence if OOD
         
         return max(0.0, min(1.0, confidence))
     

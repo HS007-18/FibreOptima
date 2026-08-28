@@ -12,6 +12,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional
+from src.v2.ood_detector import OODDetector
 
 
 # ─── canonical feature schema (must match train_model.py exactly) ────────────
@@ -53,6 +54,7 @@ class AnomalyDetector:
         self.model          = None
         self.metadata: Optional[Dict] = None
         self.feature_names_: List[str] = []
+        self.ood_detector = None
         self._load_artifacts()
 
     # ── loading ────────────────────────────────────────────────────────────
@@ -83,6 +85,11 @@ class AnomalyDetector:
             )
         except Exception:
             self.feature_names_ = []
+            
+        try:
+            self.ood_detector = OODDetector(self.artifacts_dir)
+        except Exception as e:
+            print(f"Warning: Failed to load OODDetector: {e}")
 
     # ── helpers ────────────────────────────────────────────────────────────
     @staticmethod
@@ -120,6 +127,9 @@ class AnomalyDetector:
           is_anomalous   : bool
           feature_contributions : dict  (perturbation-based attribution)
           statistical_deviations: dict  (placeholder — historical stats needed)
+          is_ood         : bool
+          ood_reasons    : list
+          prediction_confidence : str
         """
         X_proc = self._prepare(df)
 
@@ -132,11 +142,19 @@ class AnomalyDetector:
 
         contributions = self._compute_contributions(X_proc)
 
+        # OOD Detection
+        ood_result = {"is_ood": False, "ood_reasons": [], "prediction_confidence": "High"}
+        if self.ood_detector:
+            ood_result = self.ood_detector.detect(df)
+
         return {
             "anomaly_score":          anomaly_score,
             "is_anomalous":           is_anomalous,
             "feature_contributions":  contributions,
             "statistical_deviations": {},   # populated externally from historical stats
+            "is_ood":                 ood_result["is_ood"],
+            "ood_reasons":            ood_result["ood_reasons"],
+            "prediction_confidence":  ood_result["prediction_confidence"],
         }
 
     def predict_anomaly_single(self, record: Dict[str, Any]) -> Dict[str, Any]:

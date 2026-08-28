@@ -39,3 +39,6 @@ data/test/challenge_cases.csv
 dist/
 build/
 *.egg-info/
+node_modules/
+frontend/dist/
+frontend/node_modules/

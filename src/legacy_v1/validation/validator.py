@@ -4,7 +4,7 @@ import pandas as pd
 from src.legacy_v1.models.schemas import BatchRecord, ValidationReport
 
 
-def validate_records(records: list[BatchRecord], reference_df: pd.DataFrame = None) -> tuple[list[BatchRecord], ValidationReport]:
+def validate_records(records: list[BatchRecord], reference_df: pd.DataFrame = None, valid_machine_ids: set[str] = None) -> tuple[list[BatchRecord], ValidationReport]:
     report = ValidationReport()
     report.total_records = len(records)
 
@@ -57,6 +57,13 @@ def validate_records(records: list[BatchRecord], reference_df: pd.DataFrame = No
                 record.risk_level = "DATA ISSUE"
                 issues.append(msg)
                 report.invalid_values += 1
+
+        if valid_machine_ids is not None and record.machine_id not in valid_machine_ids:
+            record.invalid_value = True
+            record.is_valid = False
+            record.risk_level = "DATA ISSUE"
+            issues.append(f"Unknown Machine ID: {record.machine_id}")
+            report.invalid_values += 1
 
         if issues:
             record.data_quality_reason = "; ".join(issues)

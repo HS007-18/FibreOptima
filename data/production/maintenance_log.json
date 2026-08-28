@@ -1,0 +1,82 @@
+[
+  {
+    "machine_id": "M01",
+    "maintenance_date": "173 days ago",
+    "days_ago": 173,
+    "maintenance_type": "Corrective",
+    "issue": "Belt replacement",
+    "note": "SIMULATED COMPANY DATA"
+  },
+  {
+    "machine_id": "M02",
+    "maintenance_date": "38 days ago",
+    "days_ago": 38,
+    "maintenance_type": "Preventive",
+    "issue": "Routine service",
+    "note": "SIMULATED COMPANY DATA"
+  },
+  {
+    "machine_id": "M03",
+    "maintenance_date": "16 days ago",
+    "days_ago": 16,
+    "maintenance_type": "Preventive",
+    "issue": "Sensor calibration",
+    "note": "SIMULATED COMPANY DATA"
+  },
+  {
+    "machine_id": "M04",
+    "maintenance_date": "199 days ago",
+    "days_ago": 199,
+    "maintenance_type": "Corrective",
+    "issue": "Motor alignment",
+    "note": "SIMULATED COMPANY DATA"
+  },
+  {
+    "machine_id": "M05",
+    "maintenance_date": "80 days ago",
+    "days_ago": 80,
+    "maintenance_type": "Preventive",
+    "issue": "Bearing inspection",
+    "note": "SIMULATED COMPANY DATA"
+  },
+  {
+    "machine_id": "M06",
+    "maintenance_date": "72 days ago",
+    "days_ago": 72,
+    "maintenance_type": "Preventive",
+    "issue": "Belt replacement",
+    "note": "SIMULATED COMPANY DATA"
+  },
+  {
+    "machine_id": "M07",
+    "maintenance_date": "67 days ago",
+    "days_ago": 67,
+    "maintenance_type": "Corrective",
+    "issue": "Routine service",
+    "note": "SIMULATED COMPANY DATA"
+  },
+  {
+    "machine_id": "M08",
+    "maintenance_date": "45 days ago",
+    "days_ago": 45,
+    "maintenance_type": "Corrective",
+    "issue": "Sensor calibration",
+    "note": "SIMULATED COMPANY DATA"
+  },
+  {
+    "machine_id": "M09",
+    "maintenance_date": "198 days ago",
+    "days_ago": 198,
+    "maintenance_type": "Preventive",
+    "issue": "Motor alignment",
+    "note": "SIMULATED COMPANY DATA"
+  },
+  {
+    "machine_id": "M10",
+    "maintenance_date": "36 days ago",
+    "days_ago": 36,
+    "maintenance_type": "Preventive",
+    "issue": "Bearing inspection",
+    "note": "SIMULATED COMPANY DATA"
+  }
+]

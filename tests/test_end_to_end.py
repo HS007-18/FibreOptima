@@ -2,30 +2,31 @@ import os
 import pytest
 import pandas as pd
 from src.pipeline import FibreOptimaPipeline
-
+from src.database.company_db import CompanyDatabase
 
 def test_end_to_end_pipeline():
-    # Setup test telemetry
+    # We use an existing machine ID to trigger DB lookup
     df = pd.DataFrame(
         [
             {
                 "Batch ID": "B-TEST-01",
-                "Machine ID": "M-01",
+                "Machine ID": "M03",
                 "Fabric type": "Cotton",
-                "Operator": "Op-1",
+                "Operator": "OP03",
                 "Shift": "Morning",
                 "Production quantity": 1000.0,
-                "Production speed": 280.0,  # High speed > 250
-                "Waste quantity": 160.0,   # Waste % = 16% > 15% (biz_flag)
-                "Machine age": 12.0,       # Old machine > 10
+                "Production speed": 280.0,
+                "Waste quantity": 160.0,
+                "Machine age": 12.0,
                 "Last maintenance date": "2026-01-01",
-                "Humidity": 40.0,          # Low humidity
+                "Humidity": 40.0,
                 "Temperature": 30.0,
             }
         ]
     )
 
-    pipeline = FibreOptimaPipeline()
+    company_db = CompanyDatabase()
+    pipeline = FibreOptimaPipeline(company_db=company_db)
     packets, _ = pipeline.process_dataframe(df)
 
     assert len(packets) == 1
@@ -40,3 +41,8 @@ def test_end_to_end_pipeline():
     assert "Investigation Mode:" in report
     assert "OBSERVED EVIDENCE" in report
     assert "LOGICAL INFERENCE" in report
+    
+    # Check if DB context logic kicked in (it might mention baseline or speed)
+    # The investigation report is a string representation of InvestigationReport in pipeline.py
+    # or the OfflineInvestigationEngine formatting.
+    assert "M03" in report

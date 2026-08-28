@@ -1,0 +1,6 @@
+Batch ID,Machine ID,Fabric type,Operator,Shift,Production quantity,Production speed,Waste quantity,Machine age,Last maintenance date,Humidity,Temperature
+B-03-9845,M03,Polyester,OP03,Night,1290.45,1077.38,222.15,5.6,2026-01-15,75.4,32.6
+B-03-1607,M03,Nylon,OP01,Evening,1496.75,1017.77,288.16,7.4,2026-01-15,74.8,31.8
+B-03-4055,M03,Silk,OP01,Night,1160.19,918.68,205.88,12.5,2026-01-15,76.5,34.0
+B-03-4979,M03,Silk,OP05,Night,909.2,872.66,194.5,14.0,2026-01-15,70.1,30.6
+B-03-9709,M03,Silk,OP02,Evening,974.68,925.91,190.75,1.7,2026-01-15,80.6,31.2

@@ -87,8 +87,8 @@ class BatchResult:
     waste_z_score: Optional[float]
 
     # ML outputs
-    predicted_waste_pct: float   # PERCENTAGE — model output
-    prediction_error: float      # PERCENTAGE — |predicted - actual|
+    predicted_waste_pct: Optional[float]   # PERCENTAGE — model output
+    prediction_error: Optional[float]      # PERCENTAGE — |predicted - actual|
     anomaly_score: float
     is_anomalous: bool
 
@@ -117,6 +117,11 @@ class BatchResult:
     # Human-readable outputs
     reasons: List[str] = field(default_factory=list)
     recommendations: List[str] = field(default_factory=list)
+    
+    # OOD and Confidence
+    is_ood: bool = False
+    ood_reasons: List[str] = field(default_factory=list)
+    prediction_confidence: str = "High"
 
     # Business rule flag (waste_pct % above threshold)
     business_rule_flag: bool = False
@@ -148,8 +153,8 @@ _WASTE_PCT_BUSINESS_THRESHOLD = 15.0  # flag if waste_pct > 15%
 
 def _adapt_record(
     record: BatchRecord,
-    waste_prediction: float,
-    prediction_error: float,
+    waste_prediction: Optional[float],
+    prediction_error: Optional[float],
     anomaly_score: float,
     is_anomalous: bool,
     ml_contributions: Dict[str, float],
@@ -157,6 +162,9 @@ def _adapt_record(
     risk_level: str,
     biz_flag: bool,
     ml_flag: bool,
+    is_ood: bool = False,
+    ood_reasons: List[str] = None,
+    prediction_confidence: str = "High",
 ) -> BatchResult:
     """Convert legacy BatchRecord + ML outputs into a clean BatchResult."""
     risk_class_map = {
@@ -224,6 +232,9 @@ def _adapt_record(
         business_rule_flag=record.waste_pct > _WASTE_PCT_BUSINESS_THRESHOLD,
         observed_telemetry=observed,
         ml_contributions=ml_contributions,
+        is_ood=is_ood,
+        ood_reasons=ood_reasons or [],
+        prediction_confidence=prediction_confidence,
     )
 
 
@@ -318,21 +329,22 @@ class FibreOptimaPipeline:
         artifacts_dir: str = "models/artifacts",
         reference_date: Optional[datetime] = None,
         enable_ml: bool = True,
-        enable_rag: bool = False,  # RAG requires indexing step — opt-in
+        enable_rag: bool = False,
+        company_db: Optional[object] = None,
     ):
         self.artifacts_dir  = artifacts_dir
         self.reference_date = reference_date or SETTINGS.reference_date
         self.enable_ml      = enable_ml
         self.enable_rag     = enable_rag
+        self.company_db     = company_db
 
-        # ML models (graceful degradation if artifacts missing)
         self._waste_predictor: Optional[WastePredictor]  = None
         self._anomaly_detector: Optional[AnomalyDetector] = None
         if enable_ml:
             self._init_ml_models()
 
         # Investigation engine
-        self._investigation_engine = OfflineInvestigationEngine()
+        self._investigation_engine = OfflineInvestigationEngine(company_db=self.company_db)
 
     # ── ML model initialisation ───────────────────────────────────────────
     def _init_ml_models(self) -> None:
@@ -353,7 +365,7 @@ class FibreOptimaPipeline:
         historical_df: Optional[pd.DataFrame] = None,
     ) -> Tuple[List[BatchResult], ValidationReport, pd.DataFrame]:
         """Process a production CSV file end-to-end."""
-        records_raw = load_production_data(file_path)
+        records_raw = load_production_data(file_path)[-500:] # Process only last 500 rows for UI responsiveness
         hist_df     = historical_df if historical_df is not None else load_and_normalize_csv(file_path)
         hist_df     = self._normalise_df(hist_df)
         return self._run(records_raw, hist_df)
@@ -388,19 +400,27 @@ class FibreOptimaPipeline:
 
     # ── investigation ─────────────────────────────────────────────────────
     def investigate_packet(self, batch: BatchResult) -> str:
-        """Run offline investigation on a BatchResult and return a formatted string.
-
-        Compatible with: report = pipeline.investigate_packet(packet)
-        assert "Investigation Mode:" in report
-        assert "OBSERVED EVIDENCE" in report
-        assert "LOGICAL INFERENCE" in report
-        """
+        """Run offline investigation on a BatchResult and return a formatted string."""
+        if batch.risk_class == "Data Issue":
+            return f"Investigation Mode: SKIPPED\nRecord: {batch.record_id}  |  Risk: Data Issue\n\nInvestigation skipped due to validation failure: {batch.data_quality_reason}"
         packet_dict = self._batch_to_packet_dict(batch)
         report = self._investigation_engine.investigate(packet_dict)
         return self._format_investigation(report)
 
     def investigate_packet_structured(self, batch: BatchResult) -> InvestigationReport:
         """Return the structured InvestigationReport dataclass."""
+        if batch.risk_class == "Data Issue":
+            return InvestigationReport(
+                record_id=batch.record_id,
+                investigation_mode="SKIPPED",
+                risk_class="Data Issue",
+                confidence=0.0,
+                observed_evidence={"Error": "Data quality check failed."},
+                ml_evidence={},
+                retrieved_knowledge=[],
+                logical_inference=[f"Validation failed: {batch.data_quality_reason}"],
+                recommended_actions=["Fix input data schema and values."]
+            )
         packet_dict = self._batch_to_packet_dict(batch)
         return self._investigation_engine.investigate(packet_dict)
 
@@ -412,7 +432,11 @@ class FibreOptimaPipeline:
     ) -> Tuple[List[BatchResult], ValidationReport, pd.DataFrame]:
         """Execute the full pipeline on a list of BatchRecord objects."""
         # 1. Validate
-        records, report = validate_records(records_raw, hist_df)
+        valid_machine_ids = None
+        if self.company_db:
+            valid_machine_ids = self.company_db.get_all_machine_ids()
+            
+        records, report = validate_records(records_raw, hist_df, valid_machine_ids=valid_machine_ids)
 
         # 2. Impute missing humidity
         records = impute_missing_humidity(records, hist_df, report)
@@ -452,6 +476,9 @@ class FibreOptimaPipeline:
         anomaly_score     = 0.0
         is_anomalous      = False
         ml_contributions: Dict[str, float] = {}
+        is_ood            = False
+        ood_reasons       = []
+        prediction_confidence = "High"
 
         if record.is_valid and not record.zero_production:
             # Waste prediction
@@ -472,6 +499,9 @@ class FibreOptimaPipeline:
                     anomaly_score    = anom_result.get("anomaly_score", 0.0)
                     is_anomalous     = anom_result.get("is_anomalous", False)
                     ml_contributions = anom_result.get("feature_contributions", {})
+                    is_ood           = anom_result.get("is_ood", False)
+                    ood_reasons      = anom_result.get("ood_reasons", [])
+                    prediction_confidence = anom_result.get("prediction_confidence", "High")
                 except Exception as e:
                     print(f"[FibreOptimaPipeline] Anomaly detection failed for {record.batch_id}: {e}")
 
@@ -479,8 +509,8 @@ class FibreOptimaPipeline:
         if not record.is_valid or record.zero_production:
             return _adapt_record(
                 record,
-                waste_prediction=0.0,
-                prediction_error=0.0,
+                waste_prediction=None,
+                prediction_error=None,
                 anomaly_score=0.0,
                 is_anomalous=False,
                 ml_contributions={},
@@ -488,6 +518,8 @@ class FibreOptimaPipeline:
                 risk_level="DATA ISSUE",
                 biz_flag=False,
                 ml_flag=False,
+                is_ood=False,
+                prediction_confidence="N/A",
             )
 
         # Set machine_age_signal on record (V1 missing field)
@@ -509,6 +541,9 @@ class FibreOptimaPipeline:
             risk_level=risk_level,
             biz_flag=biz_flag,
             ml_flag=ml_flag,
+            is_ood=is_ood,
+            ood_reasons=ood_reasons,
+            prediction_confidence=prediction_confidence,
         )
 
     # ── feature dict builders ─────────────────────────────────────────────
@@ -580,6 +615,9 @@ class FibreOptimaPipeline:
             "risk_class":             batch.risk_class,
             "signals":                batch.signals,
             "ml_contributions":       batch.ml_contributions,
+            "is_ood":                 batch.is_ood,
+            "ood_reasons":            batch.ood_reasons,
+            "prediction_confidence":  batch.prediction_confidence,
         }
 
     # ── investigation formatting ──────────────────────────────────────────
@@ -728,8 +766,8 @@ class FibreOptimaPipeline:
                 "history_count":         b.history_count,
                 "waste_deviation":       round(b.waste_deviation, 6),
                 "waste_z_score":         round(b.waste_z_score, 4) if b.waste_z_score else None,
-                "predicted_waste_pct":   round(b.predicted_waste_pct, 6),
-                "prediction_error":      round(b.prediction_error, 6),
+                "predicted_waste_pct":   round(b.predicted_waste_pct, 6) if b.predicted_waste_pct is not None else None,
+                "prediction_error":      round(b.prediction_error, 6) if b.prediction_error is not None else None,
                 "anomaly_score":         round(b.anomaly_score, 4),
                 "is_anomalous":          b.is_anomalous,
                 "ml_flag":               b.ml_flag,
@@ -750,6 +788,9 @@ class FibreOptimaPipeline:
                 "data_quality_reason":   b.data_quality_reason,
                 "reasons":               "; ".join(b.reasons),
                 "recommendations":       "; ".join(b.recommendations),
+                "is_ood":                b.is_ood,
+                "ood_reasons":           "; ".join(b.ood_reasons),
+                "prediction_confidence": b.prediction_confidence,
             })
         return pd.DataFrame(rows)
 
